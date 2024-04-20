@@ -1,34 +1,100 @@
-## 前言
+## 概述
 
-网上关于动态文档生成工具有很多如：Docsify、 VuePress、Docute 、Hexo这些都是一些非常优秀的文档生成工具，本章主要介绍如何快速使用Docsify搭建一个快捷、轻量级的个人&团队文档。
+> 即时通信服务, `HTTP` 和 `WebSocket` 共用同个端口, 路由通过 `Nginx` 转发只对应的协议模块。
 
-## 什么是Docsify？
+## NGINX 配置
 
-一个神奇的文档网站生成器。docsify 可以快速帮你生成文档网站。不同于 GitBook、Hexo 的地方是它不会生成静态的 .html 文件，所有转换工作都是在运行时。如果你想要开始使用它，只需要创建一个 index.html 就可以开始编写文档。
+```shell
+# 处理 HTTP
+upstream go-http
+{
+    server 127.0.0.1:10010 weight=1 max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
 
-## Docsify的特性
+# 处理 WebSocket
+upstream go-ws
+{
+    server 127.0.0.1:10010 weight=1 max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
 
-- 无需构建，写完文档直接发布
-- 容易使用并且轻量 (压缩后 ~21kB)
-- 智能的全文搜索
-- 提供多套主题
-- 丰富的 API
-- 支持 Emoji
-- 兼容 IE11
-- 支持服务端渲染 SSR ([示例](https://github.com/docsifyjs/docsify-ssr-demo))
+server {
+        listen       80;
+        server_name  im.docker;
 
-## 轻量&完善的Docsify模板
+        # WebSocket 连接路由
+	    location / {
+            proxy_set_header Host $host;
+            proxy_pass http://go-ws/app/ws;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Connection "";
+            proxy_redirect off;
+            proxy_intercept_errors on;
+            client_max_body_size 10m;
+        }
 
-该模板为一个简洁，并且完善的Docsify模板基本上可以满足百分之八十多的团队需求，你可以按照文章中的Docsify环境配置教程把运行Docsify所需要的环境配置起来，通过命令即可查看效果（配置环境顺利的话只要十来分钟）。
+        # HTTP Web API 路由
+        location /app {
+            proxy_set_header Host $host;
+            proxy_pass http://go-http/app/api;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_redirect off;
+            proxy_intercept_errors on;
+            client_max_body_size 30m;
+        }
+
+        # HTTP RPC API 路由
+        location /api {
+            proxy_set_header Host $host;
+            proxy_pass http://go-http/api;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_redirect off;
+            proxy_intercept_errors on;
+            client_max_body_size 30m;
+        }
+}
+```
+
+## 服务启动
+
+这里假设您已经算是一名 `goer` 了，所以不过多描述基础部署，只需要如下几步即可完成服务启动。
+
+##### 下载服务项目源代码
+
+> `git clone git@github.com:raylin666/go-im.git`
+
+##### Make 能帮你做很多事
+
+> `make init`
+
+> `make generate`
+
+> `make wire`
+
+##### 运行项目
+
+> `make run`
+
+##### 访问项目
+
+> 访问 WebSocket 地址: `ws://127.0.0.1:10010`
+
+> 访问 RPC API 接口地址: `http://127.0.0.1:10010/api`
+
+> 访问 HTTP Web API 接口地址: `http://127.0.0.1:10010/app`
 
 
+## 注意要点
 
-#### 阅读文档推荐
+> 目前暂不支持多端登录, 只能单端用户账号登录, 最后登录的设备会挤掉上一个登录的用户账号。
 
-官网文档：https://docsify.js.org/#/quickstart
+#### 阅读推荐
 
-博客文档：https://blog.csdn.net/liyou123456789/article/details/124504727
+服务架构：https://github.com/raylin666/go-im
 
-CDN官网：https://www.jsdelivr.com/
-
-演示地址：https://librarycodes.gitee.io/docsify-plus
+服务文档：https://github.com/raylin666/doc-goim
